@@ -1,35 +1,4 @@
 #!/usr/bin/env python3
-"""
-run_schedule.py
-
-Reads a JSON topology description, deserializes it into a `TopologyGraph`
-(networkx-based), runs the CP-SAT (`compute_schedule_ortools`) scheduler,
-and prints the resulting schedule.
-
-Expected JSON schema:
-
-{
-  "nodes": [ {"id": 0, "pos": [0, 0]}, ... ],
-  "edges": [ {"from": 0, "to": 1, "weight": 45}, ... ],
-  "tags":  [ {"host": 1}, {"host": 2, "id": 3}, ... ],   # "id" optional
-  "cg_threshold": 30,
-  "solver": {
-    "timeout_ms": 30000,
-    "optimize": true,
-    "workers": 0,
-    "greedy": false
-  }
-}
-
-Usage:
-    python run_schedule.py topology.json
-    python run_schedule.py topology.json --repo-path /path/to/scripts
-
-Note: this script imports `topology.py` and `schedule.py` from the
-original repo's `scripts/` directory. Point --repo-path at that directory
-(or run this script from inside it / add it to PYTHONPATH) so the imports
-resolve.
-"""
 
 import argparse
 import json
@@ -38,8 +7,6 @@ from pathlib import Path
 
 
 def load_repo_modules(repo_path):
-    """Add the repo's scripts/ dir to sys.path so topology.py / schedule.py
-    can be imported, then import and return them."""
     if repo_path is not None:
         sys.path.insert(0, str(Path(repo_path).resolve()))
     try:
@@ -130,9 +97,9 @@ def print_schedule(schedule, topology_data):
     obj = schedule.get_mnz_objectives()
     print(f"Objective breakdown:")
     print(f"  carrier slots used : {obj['num_cg_slots']}")
-    print(f"  sum_cg_nodes       : {obj['sum_cg_nodes']}")
-    print(f"  sum_int_slots      : {obj['sum_int_slots']}")
-    print(f"  total (lexico obj) : {obj['total']}")
+    # print(f"  sum_cg_nodes       : {obj['sum_cg_nodes']}")
+    # print(f"  sum_int_slots      : {obj['sum_int_slots']}")
+    # print(f"  total (lexico obj) : {obj['total']}")
 
 
 def main():

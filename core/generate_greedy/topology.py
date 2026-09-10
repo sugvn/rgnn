@@ -24,45 +24,6 @@ def gen_connected_with_retry(graph_generator, max_attempts=10, **args):
 
 
 class TopologyGraph(nx.Graph):
-    """Generic network topology graph
-
-    This class represents and manipulates an heterogeneous network topology
-    that consist of a mesh network of conventional wireless nodes with
-    additional battery-free tags associated to (hosted by) some of them.
-
-    This class merely implements most of the general functionality in the
-    module but it is not meant to be instantiated directly, except when
-    explicitly building a specific topology "by hand". It is far more useful
-    and convenient to instantiate one of the following TopologyGraph sub
-    classes:
-
-        - ErdosTopologyGraph
-        - GridTopologyGraph
-        - GeometricTopologyGraph
-        - RealisticGeometricTopologyGraph
-
-    All TopologyGraphs have a few general topology properties accessible
-    through the graph dictionary (e.g.: <TopologyGraph>.graph['n_nodes']).
-    These always include: 
-        - n_nodes: The number of regular nodes
-        - n_tags: The number of tags
-        - topology: The name/type of the underlying topology (default: generic)
-    TopologyGraph sub classes may add other properties.
-
-    All nodes have a 'type' property. For regular nodes the type is 
-    'active'. Passive tags have type 'tag'. Active nodes have the property
-    'n_tags' while tags have additional property 'host'.
-    
-    All edges have a 'weight' property with value DEFAULT_EDGE_STRENGTH=1 by
-    default. Edges between tags and their host have a weight of
-    HOST_STRENGTH=400 by default.
-
-    Attributes:
-        active_nodes: The list of active or regular nodes
-        hosts: The subset of active nodes that have associated tags
-        tags: The list of tags in the topology
-        multi_tag: Allow multiple tags per host
-    """
     _DEFAULT_EDGE_STRENGTH = 1
     _HOST_STRENGTH = 400
     _NODE_LABEL_PREFIX = 'A'
@@ -108,16 +69,6 @@ class TopologyGraph(nx.Graph):
         return {t:self.nodes[t]['host'] for t in self.tags}
 
     def add_random_tags(self, n_tags, multi_tag=True):
-        """Add tags next to random nodes
-        
-        Add <n_tags> new tags next to randomly chosen active node 'hosts'. The
-        hosts are chosen so that there will always be at least one potential
-        carrier generator available. 
-
-        Args:
-            n_tags: The number of tags to add
-            multi_tag: Allow multiple tags per host
-        """
         # Make sure we only add tags to nodes with a potential
         # carrier generator as neighbor
         potential_hosts = [n for n in self.active_nodes if
@@ -164,14 +115,6 @@ class TopologyGraph(nx.Graph):
         return int(label[len(TopologyGraph._TAG_LABEL_PREFIX):])
 
     def add_tags(self, tag_assignment):
-        """Add tags to graph according to tag-to-host assignment
-
-        Adds tags 'next' to the corresponding hosts as indicated.
-
-        Args:
-            tag_assignment: A dictionary {t:h, ...} or a list of two-tuples 
-            (t, h) indicating that tag <t> should be hosted by node <h>.  
-        """
         tag_assignment = dict(tag_assignment)
         for tag, node in tag_assignment.items():
             if node not in self.nodes():
@@ -189,14 +132,6 @@ class TopologyGraph(nx.Graph):
                     self.add_edge(n, tag, **{'weight': self.edges[node,n]['weight']})
 
     def get_adjacency_matrix_string(self):
-        """Get a string representing the adjacency matrix of the topology
-        
-        This is a way to represent a graph in MiniZinc format as a 
-        2D array.
-        
-        Returns:
-            A string formatted to represent the graph in MiniZinc format  
-        """
         S = '['
         if len(self.nodes) > 0:
             a = nx.adjacency_matrix(self, nodelist=sorted(self.nodes(), key=self.node_id_from_label))
@@ -211,17 +146,6 @@ class TopologyGraph(nx.Graph):
         return S
 
     def get_problem_string(self, n_slots=None):
-        """This creates a formatted MiniZinc input
-        
-        This creates a formatted MiniZinc input corresponding to this topology.
-        
-        Args:
-            n_slots: Number of slots in the slotframe. If `None`, use one slot
-            per tag, which is the worst case.
-            
-         Returns:
-            S: A string containing the MiniZinc formatted problem string
-        """
         tag_ids_list = sorted(self.tags, key=self.tag_id_from_label)
         node_ids_list = sorted(self.active_nodes, key=self.node_id_from_label)
         node_ids_list.extend(tag_ids_list)
@@ -242,16 +166,6 @@ class TopologyGraph(nx.Graph):
         return S
             
     def clear_irrelevant_nodes(self):
-        """Remove all nodes that are not connected to any tag
-
-        Nodes that are neither neighbors to any host or hosts themselves are
-        trivially OFF during the whole tag schedule. This remove those
-        irrelevant nodes from the topology.
-
-        Returns:
-            A copy of the topology with all the 'irrelevant' nodes removed.
-            A list of the nodes that were removed
-        """
         non_relevant = list()
         for node in self.active_nodes:
             is_relevant = False
@@ -266,18 +180,6 @@ class TopologyGraph(nx.Graph):
         return new_graph, non_relevant
 
     def conflict_graph(self):
-        """Compute the conflict graph of this topology
-
-        The conflict graph contains the same (active) nodes as the original
-        topology but edges between any given pair of nodes indicate that they
-        would create interference on a neighboring tag if they were to generate
-        a carrier simultaneously. 
-
-        Returns:
-            A new topology graph of the same type, with the same active nodes
-            but without tags and with edges indicating potential conflicts as
-            described above.
-        """
         H = self.copy()
         H.remove_tags(H.tags)
         H.remove_edges_from(H.edges)
@@ -306,10 +208,6 @@ class TopologyGraph(nx.Graph):
             yield c
 
     def remove_tags(self, tags):
-        """Remove a list of tags from the topology
-
-        Makes sure to keep all the attributes updated.
-        """
         # Make a copy because often tags == self.tags
         for t in tags.copy():
             if t in self:
@@ -333,11 +231,6 @@ class TopologyGraph(nx.Graph):
         self._compute_attributes()
 
     def remove_active_nodes(self, nodes):
-        """Remove a list of active nodes from the topology
-
-        Makes sure to keep all the attributes updated. The node's hosted tags,
-        if any, will be removed too.
-        """
         for n in nodes:
             if n in self:
                 self.remove_tags(self.get_hosted_tags(n))
@@ -357,12 +250,6 @@ class TopologyGraph(nx.Graph):
                 iterations=iterations, k=k)
 
     def show(self, **kwargs):
-        """Draw the network topology using networkx's drawing functionality
-
-        Args:
-            Any keyword argument is passed directly to the
-            `visualization.TopologyVisualizer.show` method. 
-        """
         TopologyVisualizer.show(self, **kwargs)
 
     def filter_edges(self, min_weight=-1, max_weight=1000000):
@@ -389,13 +276,6 @@ class TopologyGraph(nx.Graph):
         return ret
 
     def make_reshufle_plan(self):
-        """Create a random mapping to shuffle all node and tag IDs
-
-        Returns:
-            Two dictionaries mapping the current IDs to the shuffled ones.
-            The first dictionary is for active nodes the second one for the
-            tags. 
-        """
         active_nodes_plan = dict(zip(
             self.active_nodes, 
             random.sample(self.active_nodes, len(self.active_nodes))
@@ -407,15 +287,6 @@ class TopologyGraph(nx.Graph):
         return active_nodes_plan, tags_plan
 
     def do_reshufle_ids(self, plan=None):
-        """Get a copy of topology with shuffled IDs following a plan
-
-        Args:
-            plan: An ID shufle plan as returned by make_reshufle_plan
-            represented as two dictionaries. If None, shuffle at random.
-
-        Returns:
-            A copy of the topology with shuffled IDs
-        """
         if plan is None:
             plan = self.make_reshufle_plan()
         whole_plan = dict(**plan[0], **plan[1])
@@ -427,19 +298,6 @@ class TopologyGraph(nx.Graph):
 
 
 class ErdosTopologyGraph(TopologyGraph):
-    """Topology graph based on a random binomial graph
-
-    This builds a TopologyGraph with an underlying active node topology graph
-    based on a random Erdos-Renyi or binomial graph. 
-
-    Args:
-        n_nodes: The number of active nodes
-        n_tags: The number of tags
-        p: Probability of edge creation (optional, default=1.)
-        multi_tag: Allow multiple tags per host
-        max_attempts: Max attempts at obtaining a connected graph. (optional,
-            default=10) 
-    """
     def __init__(self, n_nodes=0, n_tags=0, p=1, multi_tag=True, max_attempts=10):
         G = gen_connected_with_retry(
                 nx.gnp_random_graph, max_attempts=max_attempts,
@@ -452,20 +310,6 @@ class ErdosTopologyGraph(TopologyGraph):
 
 
 class GridTopologyGraph(TopologyGraph):
-    """Topology with active nodes located on a uniform rectangular grid.
-
-    Notice that the actual number of active nodes in the topology will be
-    ceil(n_nodes/grid_side) * grid_side. In general this will differ from
-    n_nodes. We keep the originally requested n_nodes in
-    <GridTopologyGraph>.graph['req_n_nodes'].
-
-    Args:
-        `n_nodes`: The number of active nodes
-        `n_tags`: The number of tags
-        `grid_side`: Number of nodes on one side of the grid. (The other side
-            will have `ceil(n_nodes/grid_side)`) 
-        multi_tag: Allow multiple tags per host
-    """
     def __init__(self, n_nodes=0, n_tags=0, grid_side=1, multi_tag=True):
         G = nx.grid_2d_graph(int(grid_side), ceil(n_nodes/grid_side))
         G = nx.convert_node_labels_to_integers(G, label_attribute='pos')
@@ -478,16 +322,6 @@ class GridTopologyGraph(TopologyGraph):
 
 
 class GeometricTopologyGraph(TopologyGraph):
-    """Topology with active nodes forming a random geometric graph
-
-    Args:
-        n_nodes: The number of active nodes
-        n_tags: The number of tags
-        radius: Edge formation distance threshold (default=1)
-        multi_tag: Allow multiple tags per host
-        max_attempts: Max attempts at obtaining a connected graph. (optional,
-            default=10) 
-    """
     def __init__(self, n_nodes=0, n_tags=0, radius=1, multi_tag=True, max_attempts=10):
         if n_nodes > 0:
             G = gen_connected_with_retry(
@@ -506,23 +340,6 @@ class GeometricTopologyGraph(TopologyGraph):
 
 
 class RealisticGeometricTopologyGraph(TopologyGraph):
-    """Topology where the active nodes are positioned 'realistically' 
-
-    Active nodes are distributed randomly in a square of given side length.
-    Edges are added according to a threshold distance similar to the
-    `GeometricTopologyGraph`. The threshold is scaled to maintain approximately
-    constant density. Additionally, the weight of every edge is computed
-    according to the free space path loss model. 
-
-    Arguments:
-        n_nodes: The number of active nodes
-        n_tags: The number of tags
-        side: The side length of the square where nodes are distributed
-            (default: 100) 
-        multi_tag: Allow multiple tags per host
-        max_attempts: Max attempts at obtaining a connected graph. (optional,
-            default=1000) 
-    """ 
     _CC2538_TX_POWER = 7
     _ANT_GAIN = 3
     # Wavelength in m, for frequency G=2.45GHz #
